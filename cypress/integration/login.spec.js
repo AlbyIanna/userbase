@@ -47,6 +47,8 @@ describe('Login - Signup Testing', function () {
         const currentSession = JSON.parse(localStorage.getItem('userbaseCurrentSession'))
         cy.log('session current user', localStorage.getItem('userbaseCurrentSession'))
         expect(currentSession).to.exist
+        expect(currentSession).to.haveOwnProperty('username')
+        expect(currentSession.username, 'session username to be equal to the one signed up').to.equal(randomInfo.username)
         expect(currentSession).to.haveOwnProperty('signedIn')
         expect(currentSession.signedIn, 'signedIn should be true').to.be.true
         expect(currentSession.sessionId, 'sessionId should exists').to.be.not.null
@@ -109,4 +111,38 @@ describe('Login - Signup Testing', function () {
     })
   })
 
+  it('Signup/Logout/Signin a new user in same browser, rememberMe=none', function () {
+    let randomInfo
+    let loginInfo
+    cy.getRandomInfoWithParams(null, null, 'none').then((userInfo) => {
+      randomInfo = userInfo
+      loginInfo = { username: userInfo.username, password: userInfo.password }
+    })
+
+    cy.window().then(({ userbase, window }) => {
+      window.sessionStorage.clear()
+      cy.clearLocalStorage()
+      window._userbaseEndpoint = info.endpoint
+      userbase.init({ appId: info.appId })
+      return userbase.signUp(randomInfo).then((user) => {
+        cy.log(user)
+        expect(user.username, 'user.username').to.exists
+        expect(user.username, 'user.username to be the one signed up').to.equal(randomInfo.username)
+        expect(sessionStorage.length, 'sessionStorage size').to.equal(0)
+        expect(localStorage.length, 'localStorage size').to.equal(0)
+
+        return userbase.signOut().then(() => {
+          expect(sessionStorage.length, 'sessionStorage size after sign out').to.equal(0)
+          expect(localStorage.length, 'localStorage size after sign out').to.equal(0)
+          return userbase.signIn(loginInfo).then((user) => {
+            cy.log('user', user)
+            expect(user.username, 'login should set the username').to.exist.and.to.equal(randomInfo.username)
+            return userbase.deleteUser().then(() => {
+              window.sessionStorage.clear()
+            })
+          })
+        })
+      })
+    })
+  })
 })
